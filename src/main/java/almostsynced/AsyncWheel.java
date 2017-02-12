@@ -1,54 +1,90 @@
 package almostsynced;
 
 import java.util.function.Consumer;
+import java.util.function.Supplier;
+
+import static almostsynced.Preconditions.checkNotNull;
+import static almostsynced.Preconditions.checkState;
 
 /**
  * @author Maciej Chałapuk &lt;maciej@chalapuk.pl&gt;
  */
-public class AsyncWheel<State> {
+public class AsyncWheel<Data> {
 
-    public interface Reader<State> {
+    public interface Reader<Data> {
 
-        boolean read(Consumer<State> readTick);
+        boolean read(Consumer<Data> readTick);
     }
 
-    public interface Writer<State> {
+    public interface Writer<Data> extends Reader<Data> {
 
-        boolean write(Consumer<State> writeTick);
+        void write(Consumer<Data> writeTick);
     }
 
-    private final Class<State> stateClass;
-    private boolean initialized = false;
+    private final Supplier<Data> constructor;
+    private volatile Data[] data;
 
-    public AsyncWheel(Class<State> stateClass) {
-        this.stateClass = checkNotNull(stateClass, "stateClass");
+    public AsyncWheel(Supplier<Data> constructor) {
+        this.constructor = checkNotNull(constructor, "constructor");
     }
 
-    public void initialize(Consumer<State> initializer) {
-        checkState(!initialized, "wheel already initialized");
-        initialized = true;
+    public void initialize(Consumer<Data> initializer) {
+        checkState(data == null, "wheel already initialized");
+
+        //noinspection unchecked
+        data = (Data[]) new Object[] { null, null, null };
+        for (int i = 0; i < data.length; ++i) {
+            data[0] = constructor.get();
+            initializer.accept(data[0]);
+        }
     }
 
-    public Reader<State> getReader() {
-        checkState(initialized, "wheel must be initialized before reading");
+    public Reader<Data> getReader() {
+        checkState(data != null, "wheel must be initialized before reading");
         return readTick -> false;
     }
 
-    public Writer<State> getWriter() {
-        checkState(initialized, "wheel must be initialized before writing");
-        return writeTick -> false;
-    }
+    public Writer<Data> getWriter() {
+        checkState(data != null, "wheel must be initialized before writing");
 
-    private static <T> T checkNotNull(T value, String message) {
-        if (value == null) {
-            throw new NullPointerException(message);
-        }
-        return value;
-    }
+        return new Writer<Data>() {
+            private Writer<Data> readingState = new Writer<Data>() {
 
-    private static void checkState(boolean condition, String message) {
-        if (!condition) {
-            throw new IllegalStateException(message);
-        }
+                @Override
+                public boolean read(Consumer<Data> readTick) {
+                    readTick.accept(data[0]);
+                    return true;
+                }
+
+                @Override
+                public void write(Consumer<Data> writeTick) {
+                    throw new IllegalStateException("state must be read before writing");
+                }
+            };
+
+            private Writer<Data> writingState = new Writer<Data>() {
+                @Override
+                public boolean read(Consumer<Data> readTick) {
+                    throw new IllegalStateException("state already read");
+                }
+
+                @Override
+                public void write(Consumer<Data> writeTick) {
+
+                }
+            };
+
+            private Writer<Data> currentState = readingState;
+
+            @Override
+            public void write(Consumer<Data> writeTick) {
+                currentState.write(writeTick);
+            }
+
+            @Override
+            public boolean read(Consumer<Data> readTick) {
+                return currentState.read(readTick);
+            }
+        };
     }
 }
