@@ -1,5 +1,6 @@
 package almostsynced;
 
+import java.lang.reflect.Array;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -21,21 +22,21 @@ public class AsyncWheel<Data> {
         void write(Consumer<Data> writeTick);
     }
 
-    private final Supplier<Data> constructor;
+    private final Class<Data> dataClass;
     private volatile Data[] data;
 
-    public AsyncWheel(Supplier<Data> constructor) {
-        this.constructor = checkNotNull(constructor, "constructor");
+    public AsyncWheel(Class<Data> dataClass) {
+        this.dataClass = checkNotNull(dataClass, "dataClass");
     }
 
-    public void initialize(Consumer<Data> initializer) {
+    public void initialize(Supplier<Data> constructor) {
+        checkNotNull(constructor, "constructor");
         checkState(data == null, "wheel already initialized");
 
         //noinspection unchecked
-        data = (Data[]) new Object[] { null, null, null };
+        data = (Data[]) Array.newInstance(dataClass, 3);
         for (int i = 0; i < data.length; ++i) {
             data[0] = constructor.get();
-            initializer.accept(data[0]);
         }
     }
 
