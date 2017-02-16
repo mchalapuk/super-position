@@ -17,7 +17,6 @@ class AsyncWheelSpec extends Specification {
 
         then:
         def e = thrown(NullPointerException)
-        e.printStackTrace System.out
         e.message == "dataClass"
     }
 
@@ -30,7 +29,6 @@ class AsyncWheelSpec extends Specification {
 
         then:
         def e = thrown(NullPointerException)
-        e.printStackTrace System.out
         e.message == "constructor"
     }
 
@@ -43,7 +41,6 @@ class AsyncWheelSpec extends Specification {
 
         then:
         def e = thrown(IllegalStateException)
-        e.printStackTrace System.out
         e.message == "wheel must be initialized before reading"
     }
 
@@ -56,7 +53,6 @@ class AsyncWheelSpec extends Specification {
 
         then:
         def e = thrown(IllegalStateException)
-        e.printStackTrace System.out
         e.message == "wheel must be initialized before writing"
     }
 
@@ -70,7 +66,6 @@ class AsyncWheelSpec extends Specification {
 
         then:
         def e = thrown(IllegalStateException)
-        e.printStackTrace System.out
         e.message == "wheel already initialized"
     }
 
@@ -84,7 +79,6 @@ class AsyncWheelSpec extends Specification {
 
         then:
         def e = thrown(IllegalStateException)
-        e.printStackTrace System.out
         e.message == "state must be read before writing"
     }
 
@@ -101,5 +95,43 @@ class AsyncWheelSpec extends Specification {
 
         then:
         state0.data == "initial"
+    }
+
+    def "initializes second copy of state" () {
+        given:
+        def testedWheel = new AsyncWheel<TestState>(TestState)
+
+        when:
+        testedWheel.initialize { new TestState() }
+        def writer = testedWheel.getWriter()
+
+        writer.read({ state -> })
+        writer.write({ state -> })
+
+        TestState state1 = null
+        writer.read({ state -> state1 = state })
+
+        then:
+        state1.data == "initial"
+    }
+
+    def "initializes third copy of state" () {
+        given:
+        def testedWheel = new AsyncWheel<TestState>(TestState)
+
+        when:
+        testedWheel.initialize { new TestState() }
+        def writer = testedWheel.getWriter()
+
+        writer.read({ state -> })
+        writer.write({ state -> })
+        writer.read({ state -> })
+        writer.write({ state -> })
+
+        TestState state2 = null
+        writer.read({ state -> state2 = state })
+
+        then:
+        state2.data == "initial"
     }
 }

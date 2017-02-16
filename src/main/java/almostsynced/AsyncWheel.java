@@ -54,6 +54,7 @@ public class AsyncWheel<Data> {
                 @Override
                 public boolean read(Consumer<Data> readTick) {
                     readTick.accept(data[0]);
+                    currentState = writingState;
                     return true;
                 }
 
@@ -71,7 +72,7 @@ public class AsyncWheel<Data> {
 
                 @Override
                 public void write(Consumer<Data> writeTick) {
-
+                    currentState = readingState;
                 }
             };
 
