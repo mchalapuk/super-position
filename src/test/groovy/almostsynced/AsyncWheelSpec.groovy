@@ -134,4 +134,7 @@ class AsyncWheelSpec extends Specification {
         then:
         state2.data == "initial"
     }
+
+    def "writer reads state modified in previous tick" () {
+    }
 }
