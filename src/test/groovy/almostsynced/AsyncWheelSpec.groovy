@@ -136,5 +136,40 @@ class AsyncWheelSpec extends Specification {
     }
 
     def "writer reads state modified in previous tick" () {
+        given:
+        def testedWheel = new AsyncWheel<TestState>(TestState)
+
+        when:
+        testedWheel.initialize { new TestState() }
+        def writer = testedWheel.getWriter()
+
+        writer.read({ state -> })
+        writer.write({ state -> state.data = "modified" })
+
+        TestState state2 = null
+        writer.read({ state -> state2 = state })
+
+        then:
+        state2.data == "modified"
+    }
+
+    def "writer reads state modified two ticks before" () {
+        given:
+        def testedWheel = new AsyncWheel<TestState>(TestState)
+
+        when:
+        testedWheel.initialize { new TestState() }
+        def writer = testedWheel.getWriter()
+
+        writer.read({ state -> })
+        writer.write({ state -> state.data = "modified" })
+        writer.read({ state -> })
+        writer.write({ state -> })
+
+        TestState state2 = null
+        writer.read({ state -> state2 = state })
+
+        then:
+        state2.data == "modified"
     }
 }
