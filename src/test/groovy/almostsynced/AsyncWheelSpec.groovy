@@ -172,4 +172,18 @@ class AsyncWheelSpec extends Specification {
         then:
         state2.data == "modified"
     }
+
+    def "reader returns false after initialization" () {
+        given:
+        def testedWheel = new AsyncWheel<TestState>(TestState)
+
+        when:
+        testedWheel.initialize { new TestState() }
+        def reader = testedWheel.getReader()
+
+        def ready = reader.read({ state -> })
+
+        then:
+        !ready
+    }
 }

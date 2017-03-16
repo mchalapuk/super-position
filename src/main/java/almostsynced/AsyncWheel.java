@@ -51,63 +51,70 @@ public class AsyncWheel<Data> {
     public @Nonnull Writer<Data> getWriter() {
         checkState(copies != null, "wheel must be initialized before writing");
 
-        return new Writer<Data>() {
-            private Writer<Data> readingState = new Writer<Data>() {
+        return new WriterImpl();
+    }
 
-                @Override
-                public boolean read(final @Nonnull Consumer<Data> readTick) {
-                    checkNotNull(readTick, "readTick");
-
-                    final StateCopy current = copies[writerIndex];
-                    final StateCopy currentMinusOne = copies[(writerIndex + 2) % 3];
-                    final StateCopy currentMinusTwo = copies[(writerIndex + 1) % 3];
-                    currentMinusOne.lastWriteTick.accept(current.data);
-                    currentMinusTwo.lastWriteTick.accept(current.data);
-
-                    readTick.accept(current.data);
-
-                    currentState = writingState;
-                    return true;
-                }
-
-                @Override
-                public void write(final @Nonnull Consumer<Data> writeTick) {
-                    throw new IllegalStateException("state must be read before writing");
-                }
-            };
-
-            private Writer<Data> writingState = new Writer<Data>() {
-                @Override
-                public boolean read(final @Nonnull Consumer<Data> readTick) {
-                    throw new IllegalStateException("state already read");
-                }
-
-                @Override
-                public void write(final @Nonnull Consumer<Data> writeTick) {
-                    checkNotNull(writeTick, "writeTick");
-
-                    final StateCopy current = copies[writerIndex];
-                    current.lastWriteTick = writeTick;
-
-                    writeTick.accept(current.data);
-
-                    writerIndex = (writerIndex + 1) % 3;
-                    currentState = readingState;
-                }
-            };
-
-            private Writer<Data> currentState = readingState;
-
-            @Override
-            public void write(final @Nonnull Consumer<Data> writeTick) {
-                currentState.write(writeTick);
-            }
+    private class WriterImpl implements Writer<Data> {
+        private Writer<Data> readingPhase = new Writer<Data>() {
 
             @Override
             public boolean read(final @Nonnull Consumer<Data> readTick) {
-                return currentState.read(readTick);
+                checkNotNull(readTick, "readTick");
+
+                final StateCopy current = copies[writerIndex];
+                updateWithPreviousTicks(current);
+
+                readTick.accept(current.data);
+
+                currentPhase = writingPhase;
+                return true;
+            }
+
+            @Override
+            public void write(final @Nonnull Consumer<Data> writeTick) {
+                throw new IllegalStateException("state must be read before writing");
+            }
+
+            private void updateWithPreviousTicks(StateCopy current) {
+                final StateCopy currentMinusOne = copies[(writerIndex + 2) % 3];
+                final StateCopy currentMinusTwo = copies[(writerIndex + 1) % 3];
+                currentMinusOne.lastWriteTick.accept(current.data);
+                currentMinusTwo.lastWriteTick.accept(current.data);
+            }
+
+        };
+
+        private Writer<Data> writingPhase = new Writer<Data>() {
+            @Override
+            public boolean read(final @Nonnull Consumer<Data> readTick) {
+                throw new IllegalStateException("state already read");
+            }
+
+            @Override
+            public void write(final @Nonnull Consumer<Data> writeTick) {
+                checkNotNull(writeTick, "writeTick");
+
+                final StateCopy current = copies[writerIndex];
+                current.lastWriteTick = writeTick;
+
+                writeTick.accept(current.data);
+
+                writerIndex = (writerIndex + 1) % 3;
+                currentPhase = readingPhase;
             }
         };
+
+        private Writer<Data> currentPhase = readingPhase;
+
+        @Override
+        public void write(final @Nonnull Consumer<Data> writeTick) {
+            currentPhase.write(writeTick);
+        }
+
+        @Override
+        public boolean read(final @Nonnull Consumer<Data> readTick) {
+            return currentPhase.read(readTick);
+        }
     }
 
     private class StateCopy {
