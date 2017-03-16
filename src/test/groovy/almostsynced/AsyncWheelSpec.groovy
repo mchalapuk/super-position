@@ -173,7 +173,7 @@ class AsyncWheelSpec extends Specification {
         state2.data == "modified"
     }
 
-    def "reader returns false after initialization" () {
+    def "reader not ready after initialization" () {
         given:
         def testedWheel = new AsyncWheel<TestState>(TestState)
 
@@ -185,5 +185,22 @@ class AsyncWheelSpec extends Specification {
 
         then:
         !ready
+    }
+
+    def "reader ready after first copy modified" () {
+        given:
+        def testedWheel = new AsyncWheel<TestState>(TestState)
+
+        when:
+        testedWheel.initialize { new TestState() }
+        def writer = testedWheel.getWriter()
+        def reader = testedWheel.getReader()
+
+        writer.read({ state -> })
+        writer.write({ state -> })
+        def ready = reader.read({ state -> })
+
+        then:
+        ready
     }
 }

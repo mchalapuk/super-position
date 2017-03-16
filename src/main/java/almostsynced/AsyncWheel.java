@@ -26,7 +26,8 @@ public class AsyncWheel<Data> {
     private final Class<Data> dataClass;
     private volatile StateCopy[] copies;
 
-    private int writerIndex = 0;
+    private volatile int writerIndex = 0;
+    private volatile int readerIndex = -1;
 
     public AsyncWheel(final @Nonnull Class<Data> dataClass) {
         this.dataClass = checkNotNull(dataClass, "dataClass");
@@ -45,13 +46,20 @@ public class AsyncWheel<Data> {
 
     public @Nonnull Reader<Data> getReader() {
         checkState(copies != null, "wheel must be initialized before reading");
-        return readTick -> false;
+        return new ReaderImpl();
     }
 
     public @Nonnull Writer<Data> getWriter() {
         checkState(copies != null, "wheel must be initialized before writing");
 
         return new WriterImpl();
+    }
+
+    private class ReaderImpl implements Reader<Data> {
+        @Override
+        public boolean read(@Nonnull Consumer<Data> readTick) {
+            return readerIndex < writerIndex - 1;
+        }
     }
 
     private class WriterImpl implements Writer<Data> {
