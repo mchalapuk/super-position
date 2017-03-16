@@ -11,18 +11,9 @@ class AsyncWheelSpec extends Specification {
         String data = "initial"
     }
 
-    def "throws when constructing with null dataClass" () {
-        when:
-        new AsyncWheel<TestState>(null)
-
-        then:
-        def e = thrown(NullPointerException)
-        e.message == "dataClass"
-    }
-
     def "throws when initializing with null constructor" () {
         given:
-        def testedWheel = new AsyncWheel<TestState>(TestState)
+        def testedWheel = new AsyncWheel<TestState>()
 
         when:
         testedWheel.initialize null
@@ -34,7 +25,7 @@ class AsyncWheelSpec extends Specification {
 
     def "throws when reading not initialized" () {
         given:
-        def testedWheel = new AsyncWheel<TestState>(TestState)
+        def testedWheel = new AsyncWheel<TestState>()
 
         when:
         testedWheel.getReader()
@@ -46,7 +37,7 @@ class AsyncWheelSpec extends Specification {
 
     def "throws when writing not initialized" () {
         given:
-        def testedWheel = new AsyncWheel<TestState>(TestState)
+        def testedWheel = new AsyncWheel<TestState>()
 
         when:
         testedWheel.getWriter()
@@ -58,7 +49,7 @@ class AsyncWheelSpec extends Specification {
 
     def "throws when initializing twice" () {
         given:
-        def testedWheel = new AsyncWheel<TestState>(TestState)
+        def testedWheel = new AsyncWheel<TestState>()
 
         when:
         testedWheel.initialize {}
@@ -71,7 +62,7 @@ class AsyncWheelSpec extends Specification {
 
     def "throws when calling Writer.write before Writer.read" () {
         given:
-        def testedWheel = new AsyncWheel<TestState>(TestState)
+        def testedWheel = new AsyncWheel<TestState>()
 
         when:
         testedWheel.initialize {}
@@ -84,7 +75,7 @@ class AsyncWheelSpec extends Specification {
 
     def "initializes first copy of state" () {
         given:
-        def testedWheel = new AsyncWheel<TestState>(TestState)
+        def testedWheel = new AsyncWheel<TestState>()
 
         when:
         testedWheel.initialize { new TestState() }
@@ -99,7 +90,7 @@ class AsyncWheelSpec extends Specification {
 
     def "initializes second copy of state" () {
         given:
-        def testedWheel = new AsyncWheel<TestState>(TestState)
+        def testedWheel = new AsyncWheel<TestState>()
 
         when:
         testedWheel.initialize { new TestState() }
@@ -117,7 +108,7 @@ class AsyncWheelSpec extends Specification {
 
     def "initializes third copy of state" () {
         given:
-        def testedWheel = new AsyncWheel<TestState>(TestState)
+        def testedWheel = new AsyncWheel<TestState>()
 
         when:
         testedWheel.initialize { new TestState() }
@@ -137,7 +128,7 @@ class AsyncWheelSpec extends Specification {
 
     def "writer reads state modified in previous tick" () {
         given:
-        def testedWheel = new AsyncWheel<TestState>(TestState)
+        def testedWheel = new AsyncWheel<TestState>()
 
         when:
         testedWheel.initialize { new TestState() }
@@ -155,7 +146,7 @@ class AsyncWheelSpec extends Specification {
 
     def "writer reads state modified two ticks before" () {
         given:
-        def testedWheel = new AsyncWheel<TestState>(TestState)
+        def testedWheel = new AsyncWheel<TestState>()
 
         when:
         testedWheel.initialize { new TestState() }
@@ -175,7 +166,7 @@ class AsyncWheelSpec extends Specification {
 
     def "reader not ready after initialization" () {
         given:
-        def testedWheel = new AsyncWheel<TestState>(TestState)
+        def testedWheel = new AsyncWheel<TestState>()
 
         when:
         testedWheel.initialize { new TestState() }
@@ -189,7 +180,7 @@ class AsyncWheelSpec extends Specification {
 
     def "reader ready after first copy modified" () {
         given:
-        def testedWheel = new AsyncWheel<TestState>(TestState)
+        def testedWheel = new AsyncWheel<TestState>()
 
         when:
         testedWheel.initialize { new TestState() }

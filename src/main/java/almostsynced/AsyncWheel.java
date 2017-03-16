@@ -23,15 +23,10 @@ public class AsyncWheel<Data> {
         void write(@Nonnull Consumer<Data> writeTick);
     }
 
-    private final Class<Data> dataClass;
     private volatile StateCopy[] copies;
 
     private volatile int writerIndex = 0;
     private volatile int readerIndex = -1;
-
-    public AsyncWheel(final @Nonnull Class<Data> dataClass) {
-        this.dataClass = checkNotNull(dataClass, "dataClass");
-    }
 
     public void initialize(final @Nonnull Supplier<Data> constructor) {
         checkNotNull(constructor, "constructor");
