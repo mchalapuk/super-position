@@ -23,10 +23,11 @@ public class AsyncWheel<Data> {
         void write(@Nonnull Consumer<Data> writeTick);
     }
 
-    private volatile StateCopy[] copies;
+    private final Writer<Data> writer = new WriterImpl();
 
-    private volatile int writerIndex = 0;
-    private volatile int readerIndex = 0;
+    private volatile Reader<Data> readingStrategy = readTick -> false;
+
+    private StateCopy[] copies;
 
     public void initialize(final @Nonnull Supplier<Data> constructor) {
         checkNotNull(constructor, "constructor");
@@ -41,13 +42,12 @@ public class AsyncWheel<Data> {
 
     public @Nonnull Reader<Data> getReader() {
         checkState(copies != null, "wheel must be initialized before reading");
-        return new ReaderImpl();
+        return tick -> readingStrategy.read(tick);
     }
 
     public @Nonnull Writer<Data> getWriter() {
         checkState(copies != null, "wheel must be initialized before writing");
-
-        return new WriterImpl();
+        return writer;
     }
 
     private class StateCopy {
@@ -60,20 +60,8 @@ public class AsyncWheel<Data> {
         }
     }
 
-    private class ReaderImpl implements Reader<Data> {
-        @Override
-        public boolean read(@Nonnull Consumer<Data> readTick) {
-            if (readerIndex == writerIndex) {
-                return false;
-            }
-
-            readTick.accept(copies[readerIndex++].data);
-            return true;
-        }
-    }
-
     private class WriterImpl implements Writer<Data> {
-        private Writer<Data> readingPhase = new Writer<Data>() {
+        private final Writer<Data> readingPhase = new Writer<Data>() {
 
             @Override
             public boolean read(final @Nonnull Consumer<Data> readTick) {
@@ -99,10 +87,9 @@ public class AsyncWheel<Data> {
                 currentMinusOne.lastWriteTick.accept(current.data);
                 currentMinusTwo.lastWriteTick.accept(current.data);
             }
-
         };
 
-        private Writer<Data> writingPhase = new Writer<Data>() {
+        private final Writer<Data> writingPhase = new Writer<Data>() {
             @Override
             public boolean read(final @Nonnull Consumer<Data> readTick) {
                 throw new IllegalStateException("state already read");
@@ -117,12 +104,27 @@ public class AsyncWheel<Data> {
 
                 writeTick.accept(current.data);
 
-                writerIndex = (writerIndex + 1) % 3;
+                setReadingStrategy(readingStrategy, writerIndex);
+                writerIndex = incrementIndex(writerIndex);
                 currentPhase = readingPhase;
+            }
+
+            private void setReadingStrategy(final @Nonnull Reader<Data> previousStrategy, final int readerIndex) {
+                readingStrategy = readTick -> {
+                    readTick.accept(copies[readerIndex].data);
+                    readingStrategy = previousStrategy;
+                    return true;
+                };
+            }
+
+            private int incrementIndex(final int index) {
+                return (index + 1) % 3;
             }
         };
 
         private Writer<Data> currentPhase = readingPhase;
+
+        private int writerIndex = 0;
 
         @Override
         public void write(final @Nonnull Consumer<Data> writeTick) {

@@ -226,9 +226,7 @@ class AsyncWheelSpec extends Specification {
         writer.read { state -> }
         writer.write { state ->  }
 
-        TestState state2 = null
         reader.read { state -> }
-
         def ready = reader.read { state -> }
 
         then:
