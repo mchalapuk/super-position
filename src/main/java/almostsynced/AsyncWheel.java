@@ -26,7 +26,7 @@ public class AsyncWheel<Data> {
     private volatile StateCopy[] copies;
 
     private volatile int writerIndex = 0;
-    private volatile int readerIndex = -1;
+    private volatile int readerIndex = 0;
 
     public void initialize(final @Nonnull Supplier<Data> constructor) {
         checkNotNull(constructor, "constructor");
@@ -50,10 +50,25 @@ public class AsyncWheel<Data> {
         return new WriterImpl();
     }
 
+    private class StateCopy {
+        private Data data;
+        private Consumer<Data> lastWriteTick;
+
+        public StateCopy(final Data data) {
+            this.data = data;
+            this.lastWriteTick = unused -> {};
+        }
+    }
+
     private class ReaderImpl implements Reader<Data> {
         @Override
         public boolean read(@Nonnull Consumer<Data> readTick) {
-            return readerIndex < writerIndex - 1;
+            if (readerIndex == writerIndex) {
+                return false;
+            }
+
+            readTick.accept(copies[readerIndex++].data);
+            return true;
         }
     }
 
@@ -117,16 +132,6 @@ public class AsyncWheel<Data> {
         @Override
         public boolean read(final @Nonnull Consumer<Data> readTick) {
             return currentPhase.read(readTick);
-        }
-    }
-
-    private class StateCopy {
-        private Data data;
-        private Consumer<Data> lastWriteTick;
-
-        public StateCopy(final Data data) {
-            this.data = data;
-            this.lastWriteTick = unused -> {};
         }
     }
 }

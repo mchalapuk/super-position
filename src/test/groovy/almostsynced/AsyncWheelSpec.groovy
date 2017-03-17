@@ -194,4 +194,44 @@ class AsyncWheelSpec extends Specification {
         then:
         ready
     }
+
+    def "reader reads state modified by writer" () {
+        given:
+        def testedWheel = new AsyncWheel<TestState>()
+
+        when:
+        testedWheel.initialize { new TestState() }
+        def writer = testedWheel.getWriter()
+        def reader = testedWheel.getReader()
+
+        writer.read { state -> }
+        writer.write { state -> state.data = "modified" }
+
+        TestState state2 = null
+        reader.read { state -> state2 = state }
+
+        then:
+        state2.data == "modified"
+    }
+
+    def "reader not ready after all state read" () {
+        given:
+        def testedWheel = new AsyncWheel<TestState>()
+
+        when:
+        testedWheel.initialize { new TestState() }
+        def writer = testedWheel.getWriter()
+        def reader = testedWheel.getReader()
+
+        writer.read { state -> }
+        writer.write { state ->  }
+
+        TestState state2 = null
+        reader.read { state -> }
+
+        def ready = reader.read { state -> }
+
+        then:
+        !ready
+    }
 }
