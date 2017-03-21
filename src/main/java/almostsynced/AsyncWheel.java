@@ -12,13 +12,13 @@ import static almostsynced.Preconditions.checkState;
  * @author Maciej Chałapuk &lt;maciej@chalapuk.pl&gt;
  */
 public class AsyncWheel<Data> {
-
     public interface Reader<Data> {
 
         boolean read(@Nonnull Consumer<Data> readTick);
     }
 
-    public interface Writer<Data> extends Reader<Data> {
+    public interface Writer<Data> {
+        void read(@Nonnull Consumer<Data> readTick);
 
         void write(@Nonnull Consumer<Data> writeTick);
     }
@@ -64,7 +64,7 @@ public class AsyncWheel<Data> {
         private final Writer<Data> readingPhase = new Writer<Data>() {
 
             @Override
-            public boolean read(final @Nonnull Consumer<Data> readTick) {
+            public void read(final @Nonnull Consumer<Data> readTick) {
                 checkNotNull(readTick, "readTick");
 
                 final StateCopy current = copies[writerIndex];
@@ -73,7 +73,6 @@ public class AsyncWheel<Data> {
                 readTick.accept(current.data);
 
                 currentPhase = writingPhase;
-                return true;
             }
 
             @Override
@@ -91,7 +90,7 @@ public class AsyncWheel<Data> {
 
         private final Writer<Data> writingPhase = new Writer<Data>() {
             @Override
-            public boolean read(final @Nonnull Consumer<Data> readTick) {
+            public void read(final @Nonnull Consumer<Data> readTick) {
                 throw new IllegalStateException("state already read");
             }
 
@@ -132,8 +131,8 @@ public class AsyncWheel<Data> {
         }
 
         @Override
-        public boolean read(final @Nonnull Consumer<Data> readTick) {
-            return currentPhase.read(readTick);
+        public void read(final @Nonnull Consumer<Data> readTick) {
+            currentPhase.read(readTick);
         }
     }
 }
