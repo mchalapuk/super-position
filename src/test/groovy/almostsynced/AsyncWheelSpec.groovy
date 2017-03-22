@@ -32,7 +32,7 @@ class AsyncWheelSpec extends Specification {
 
         then:
         def e = thrown(IllegalStateException)
-        e.message == "wheel must be initialized before reading"
+        e.message == "wheel must be initialized before stateCopy"
     }
 
     def "throws when writing not initialized" () {
@@ -44,7 +44,7 @@ class AsyncWheelSpec extends Specification {
 
         then:
         def e = thrown(IllegalStateException)
-        e.message == "wheel must be initialized before writing"
+        e.message == "wheel must be initialized before stateCopy"
     }
 
     def "throws when initializing twice" () {
@@ -52,8 +52,8 @@ class AsyncWheelSpec extends Specification {
         def testedWheel = new AsyncWheel<TestState>()
 
         when:
-        testedWheel.initialize {}
-        testedWheel.initialize {}
+        testedWheel.initialize { new TestState() }
+        testedWheel.initialize { new TestState() }
 
         then:
         def e = thrown(IllegalStateException)
@@ -65,12 +65,12 @@ class AsyncWheelSpec extends Specification {
         def testedWheel = new AsyncWheel<TestState>()
 
         when:
-        testedWheel.initialize {}
+        testedWheel.initialize { new TestState() }
         testedWheel.getWriter().write {}
 
         then:
         def e = thrown(IllegalStateException)
-        e.message == "state must be read before writing"
+        e.message == "stateCopy must be read before stateCopy"
     }
 
     def "initializes first copy of state" () {
@@ -214,7 +214,7 @@ class AsyncWheelSpec extends Specification {
         state2.data == "modified"
     }
 
-    def "reader not ready after all state read" () {
+    def "reader not ready after reading first state modified by writer" () {
         given:
         def testedWheel = new AsyncWheel<TestState>()
 
@@ -223,6 +223,31 @@ class AsyncWheelSpec extends Specification {
         def writer = testedWheel.getWriter()
         def reader = testedWheel.getReader()
 
+        writer.read { state -> }
+        writer.write { state ->  }
+
+        reader.read { state -> }
+        def ready = reader.read { state -> }
+
+        then:
+        !ready
+    }
+
+    def "reader not ready after reading last state modified by writer" () {
+        given:
+        def testedWheel = new AsyncWheel<TestState>()
+
+        when:
+        testedWheel.initialize { new TestState() }
+        def writer = testedWheel.getWriter()
+        def reader = testedWheel.getReader()
+
+        writer.read { state -> }
+        writer.write { state ->  }
+        writer.read { state -> }
+        writer.write { state ->  }
+        writer.read { state -> }
+        writer.write { state ->  }
         writer.read { state -> }
         writer.write { state ->  }
 

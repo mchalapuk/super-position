@@ -1,7 +1,10 @@
 package almostsynced;
 
 import javax.annotation.Nonnull;
-import java.lang.reflect.Array;
+
+import java.util.LinkedList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -13,50 +16,55 @@ import static almostsynced.Preconditions.checkState;
  */
 public class AsyncWheel<Data> {
     public interface Reader<Data> {
-
         boolean read(@Nonnull Consumer<Data> readTick);
     }
 
     public interface Writer<Data> {
         void read(@Nonnull Consumer<Data> readTick);
-
         void write(@Nonnull Consumer<Data> writeTick);
     }
 
-    private final Writer<Data> writer = new WriterImpl();
+    private final AtomicReference<StateCopy<Data>> free = new AtomicReference<>(); // accessed by reader and writer
 
-    private volatile Reader<Data> readingStrategy = readTick -> false;
-
-    private StateCopy[] copies;
+    private Writer<Data> writer;
+    private Reader<Data> reader;
 
     public void initialize(final @Nonnull Supplier<Data> constructor) {
         checkNotNull(constructor, "constructor");
-        checkState(copies == null, "wheel already initialized");
+        checkState(free.get() == null, "wheel already initialized");
 
-        //noinspection unchecked
-        copies = (StateCopy[]) Array.newInstance(StateCopy.class, 3);
-        for (int i = 0; i < copies.length; ++i) {
-            copies[i] = new StateCopy(constructor.get());
-        }
+        final List<Consumer<Data>> freeUpdates = new LinkedList<>();
+        final List<Consumer<Data>> writingUpdates = new LinkedList<>();
+        final List<Consumer<Data>> readingUpdates = new LinkedList<>();
+
+        free.set(new StateCopy<>(constructor.get(), freeUpdates, writingUpdates, readingUpdates));
+        writer = new WriterImpl(new StateCopy<>(constructor.get(), writingUpdates, readingUpdates, freeUpdates));
+        reader = new ReaderImpl(new StateCopy<>(constructor.get(), readingUpdates, writingUpdates, freeUpdates));
     }
 
     public @Nonnull Reader<Data> getReader() {
-        checkState(copies != null, "wheel must be initialized before reading");
-        return tick -> readingStrategy.read(tick);
+        checkState(reader != null, "wheel must be initialized before stateCopy");
+        return reader;
     }
 
     public @Nonnull Writer<Data> getWriter() {
-        checkState(copies != null, "wheel must be initialized before writing");
+        checkState(writer != null, "wheel must be initialized before stateCopy");
         return writer;
     }
 
-    private class StateCopy {
-        private Data data;
-        private Consumer<Data> lastWriteTick;
+    private class ReaderImpl implements Reader<Data> {
+        private StateCopy<Data> stateCopy;
 
-        public StateCopy(final Data data) {
-            this.data = data;
-            this.lastWriteTick = unused -> {};
+        public ReaderImpl(final @Nonnull StateCopy<Data> stateCopy) {
+            this.stateCopy = stateCopy;
+        }
+
+        @Override
+        public boolean read(final @Nonnull Consumer<Data> readTick) {
+            checkNotNull(readTick, "readTick");
+
+            stateCopy = free.getAndSet(stateCopy);
+            return stateCopy.read(readTick);
         }
     }
 
@@ -65,74 +73,101 @@ public class AsyncWheel<Data> {
 
             @Override
             public void read(final @Nonnull Consumer<Data> readTick) {
-                checkNotNull(readTick, "readTick");
-
-                final StateCopy current = copies[writerIndex];
-                updateWithPreviousTicks(current);
-
-                readTick.accept(current.data);
-
+                stateCopy.updateAndRead(readTick);
                 currentPhase = writingPhase;
             }
 
             @Override
             public void write(final @Nonnull Consumer<Data> writeTick) {
-                throw new IllegalStateException("state must be read before writing");
-            }
-
-            private void updateWithPreviousTicks(StateCopy current) {
-                final StateCopy currentMinusOne = copies[(writerIndex + 2) % 3];
-                final StateCopy currentMinusTwo = copies[(writerIndex + 1) % 3];
-                currentMinusOne.lastWriteTick.accept(current.data);
-                currentMinusTwo.lastWriteTick.accept(current.data);
+                throw new IllegalStateException("stateCopy must be read before stateCopy");
             }
         };
 
         private final Writer<Data> writingPhase = new Writer<Data>() {
             @Override
             public void read(final @Nonnull Consumer<Data> readTick) {
-                throw new IllegalStateException("state already read");
+                throw new IllegalStateException("stateCopy already read");
             }
 
             @Override
             public void write(final @Nonnull Consumer<Data> writeTick) {
-                checkNotNull(writeTick, "writeTick");
-
-                final StateCopy current = copies[writerIndex];
-                current.lastWriteTick = writeTick;
-
-                writeTick.accept(current.data);
-
-                setReadingStrategy(readingStrategy, writerIndex);
-                writerIndex = incrementIndex(writerIndex);
+                stateCopy.write(writeTick);
+                stateCopy = free.getAndSet(stateCopy);
                 currentPhase = readingPhase;
-            }
-
-            private void setReadingStrategy(final @Nonnull Reader<Data> previousStrategy, final int readerIndex) {
-                readingStrategy = readTick -> {
-                    readTick.accept(copies[readerIndex].data);
-                    readingStrategy = previousStrategy;
-                    return true;
-                };
-            }
-
-            private int incrementIndex(final int index) {
-                return (index + 1) % 3;
             }
         };
 
         private Writer<Data> currentPhase = readingPhase;
+        private StateCopy<Data> stateCopy;
 
-        private int writerIndex = 0;
+        public WriterImpl(final @Nonnull StateCopy<Data> stateCopy) {
+            this.stateCopy = stateCopy;
+        }
 
         @Override
         public void write(final @Nonnull Consumer<Data> writeTick) {
-            currentPhase.write(writeTick);
+            currentPhase.write(checkNotNull(writeTick, "writeTick"));
         }
 
         @Override
         public void read(final @Nonnull Consumer<Data> readTick) {
-            currentPhase.read(readTick);
+            currentPhase.read(checkNotNull(readTick, "readTick"));
         }
+    }
+
+    private static class StateCopy<Data> {
+        private final Data data;
+
+        // accessed only by writer
+        private List<Consumer<Data>> updates;
+        private List<Consumer<Data>> other0Updates;
+        private List<Consumer<Data>> other1Updates;
+
+        // accessed by reader and writer
+        private volatile ReadingStrategy<Data> readingStrategy = this::notReadyRead;
+
+        public StateCopy(final @Nonnull Data data,
+                         final @Nonnull List<Consumer<Data>> updates,
+                         final @Nonnull List<Consumer<Data>> other0Updates,
+                         final @Nonnull List<Consumer<Data>> other1Updates) {
+            this.data = data;
+            this.updates = updates;
+            this.other0Updates = other0Updates;
+            this.other1Updates = other1Updates;
+        }
+
+        public boolean read(final @Nonnull Consumer<Data> readTick) {
+            return readingStrategy.read(readTick);
+        }
+
+        public void updateAndRead(final @Nonnull Consumer<Data> readTick) {
+            updates.forEach(tick -> tick.accept(data));
+            updates.clear();
+            readTick.accept(data);
+        }
+
+        public void write(final @Nonnull Consumer<Data> writeTick) {
+            writeTick.accept(data);
+
+            other0Updates.add(writeTick);
+            other1Updates.add(writeTick);
+
+            readingStrategy = this::readyRead;
+        }
+
+        @SuppressWarnings("unused")
+        private boolean notReadyRead(final @Nonnull Consumer<Data> readTick) {
+            return false;
+        }
+
+        private boolean readyRead(final @Nonnull Consumer<Data> readTick) {
+            readingStrategy = this::notReadyRead;
+            readTick.accept(data);
+            return true;
+        }
+    }
+
+    private interface ReadingStrategy<Data> {
+        boolean read(@Nonnull Consumer<Data> readTick);
     }
 }
