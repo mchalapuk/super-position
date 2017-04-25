@@ -16,5 +16,5 @@ include 'api'
 include 'services:webservice'
 */
 
-rootProject.name = 'almost-synced'
+rootProject.name = 'super-position'
 

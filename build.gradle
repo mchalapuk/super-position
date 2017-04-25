@@ -1,10 +1,10 @@
 apply plugin: 'java'
 apply plugin: 'groovy'
 
-group = 'pl.chalapuk'
+group = 'pl.chalapuk.morejuice'
 version = '0.1'
 
-description = 'AlmostSynced - Share state without resource locking in Java.'
+description = 'SuperPosition - Share state without resource locking in Java.'
 
 repositories {
     jcenter()
