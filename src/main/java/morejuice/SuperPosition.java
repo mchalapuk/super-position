@@ -1,4 +1,4 @@
-package almostsynced;
+package morejuice;
 
 import javax.annotation.Nonnull;
 
@@ -8,8 +8,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import static almostsynced.Preconditions.checkNotNull;
-import static almostsynced.Preconditions.checkState;
+import static morejuice.Preconditions.checkNotNull;
+import static morejuice.Preconditions.checkState;
 
 /**
  * @author Maciej Chałapuk &lt;maciej@chalapuk.pl&gt;

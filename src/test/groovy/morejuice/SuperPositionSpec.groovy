@@ -1,4 +1,4 @@
-package almostsynced
+package morejuice
 
 import spock.lang.Specification
 

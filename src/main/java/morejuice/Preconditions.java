@@ -1,4 +1,4 @@
-package almostsynced;
+package morejuice;
 
 /**
  * Clone of Guava's Preconditions class (this library is dependency free).
