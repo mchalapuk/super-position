@@ -1,7 +1,7 @@
 apply plugin: 'java'
 apply plugin: 'groovy'
 
-group = 'pl.chalapuk.morejuice'
+group = 'pl.chalapuk.superposition'
 version = '0.1'
 
 description = 'SuperPosition - Share state without resource locking in Java.'

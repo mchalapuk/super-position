@@ -1,4 +1,4 @@
-package morejuice;
+package pl.chalapuk.superposition;
 
 import javax.annotation.Nonnull;
 
@@ -8,8 +8,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import static morejuice.Preconditions.checkNotNull;
-import static morejuice.Preconditions.checkState;
+import static pl.chalapuk.superposition.Preconditions.checkNotNull;
+import static pl.chalapuk.superposition.Preconditions.checkState;
 
 /**
  * @author Maciej Chałapuk &lt;maciej@chalapuk.pl&gt;

@@ -1,4 +1,4 @@
-package morejuice
+package pl.chalapuk.superposition
 
 import spock.lang.Specification
 

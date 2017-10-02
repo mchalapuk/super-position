@@ -1,4 +1,4 @@
-package morejuice;
+package pl.chalapuk.superposition;
 
 /**
  * Clone of Guava's Preconditions class (this library is dependency free).
